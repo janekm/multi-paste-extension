@@ -3,6 +3,27 @@
 
   let currentLine = 0;
 
+  function loadTextFromChunks() {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get(null, (result) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else if (result.chunkCount) {
+          const chunks = [];
+          for (let i = 0; i < result.chunkCount; i++) {
+            chunks.push(result[`chunk_${i}`]);
+          }
+          resolve({
+            text: chunks.join(''),
+            prependString: result.prependString || ''
+          });
+        } else {
+          resolve({ text: '', prependString: '' });
+        }
+      });
+    });
+  }
+
   chrome.commands.onCommand.addListener((command) => {
     console.log('%c Command Received: ' + command, 'background: #222; color: #bada55');
     if (command === "replace-text") {
@@ -39,11 +60,11 @@
   }
 
   function sendReplaceTextMessage(tabId) {
-    chrome.storage.local.get(['replacementText', 'prependString'], (data) => {
-      console.log("Stored replacement text:", data.replacementText);
+    loadTextFromChunks().then((data) => {
+      console.log("Stored replacement text length:", data.text.length);
       console.log("Stored prepend string:", data.prependString);
-      if (data.replacementText) {
-        const lines = data.replacementText.split('\n');
+      if (data.text) {
+        const lines = data.text.split('\n');
         if (currentLine >= lines.length) {
           currentLine = 0;
         }
@@ -64,6 +85,8 @@
       } else {
         console.log("No replacement text found in storage");
       }
+    }).catch((error) => {
+      console.error("Error loading data:", error);
     });
   }
 })();
